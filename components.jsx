@@ -1,4 +1,4 @@
-/* Presentational components for the hub. */
+﻿/* Presentational components for the hub. */
 const { I: Ic, Svg: SvgIco, catMeta } = window.VFXIcons;
 
 function fmtSize(bytes) {
@@ -235,29 +235,50 @@ function DownloadZone({ item, onDownload }) {
 }
 
 /* ── Modal ────────────────────────────────────────────────── */
-function Modal({ item, onClose, onDownload }) {
-  useEffect(() => {
-    const k = (e) => { if (e.key === 'Escape') onClose(); };
+function Modal({ item, onClose, onDownload, webglReady, webglLoading, onWebglLoad }) {
+  var previewRef = useRef(null);
+
+  useEffect(function () {
+    var k = function (e) { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', k);
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', k); document.body.style.overflow = ''; };
+    return function () { document.removeEventListener('keydown', k); document.body.style.overflow = ''; };
   }, [item]);
 
+  // When modal opens and WebGL is ready, attach viewer and load effect
+  useEffect(function () {
+    if (webglReady && previewRef.current && item) {
+      WebGLBridge.attachTo(previewRef.current);
+      WebGLBridge.loadEffect(item.id);
+      if (onWebglLoad) onWebglLoad();
+    }
+  }, [item, webglReady]);
+
   if (!item) return null;
-  const meta = catMeta(item.category);
-  const deps = item.dependencies || [];
+  var meta = catMeta(item.category);
+  var deps = item.dependencies || [];
 
   return (
-    <div className="modal-scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-scrim" onClick={function (e) { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal">
-        <div className="modal-preview">
-          <img
-            src={VFX_API.thumbnailUrl(item.id)}
-            alt={item.name}
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-          />
+        <div className="modal-preview" ref={previewRef}>
+          {!webglReady && (
+            <img
+              src={VFX_API.thumbnailUrl(item.id)}
+              alt={item.name}
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            />
+          )}
+          {webglLoading && (
+            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.5)', zIndex: 5 }}>
+              <div style={{ textAlign: 'center', color: '#fff' }}>
+                <div style={{ width: 30, height: 30, border: '2px solid #7c4dff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 8px' }}></div>
+                <div style={{ fontSize: 12, opacity: 0.7 }}>Loading effect...</div>
+              </div>
+            </div>
+          )}
           <div className="mp-tools">
-            <span className="mp-pill">PREVIEW</span>
+            <span className="mp-pill">{webglReady ? <><span className="live"></span> LIVE</> : 'PREVIEW'}</span>
             <span className="mp-pill">{item.category}</span>
           </div>
         </div>

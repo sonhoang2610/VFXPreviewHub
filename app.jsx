@@ -59,6 +59,18 @@ function App() {
   const [active, setActive] = useState(null); // modal item
   const [toast, setToast] = useState(null);
 
+  // WebGL viewer state
+  const [webglReady, setWebglReady] = useState(false);
+  const [webglLoading, setWebglLoading] = useState(false);
+
+  // Initialize WebGL viewer on mount
+  useEffect(function () {
+    WebGLBridge.init();
+    WebGLBridge.onReady = function () { setWebglReady(true); };
+    WebGLBridge.onLoaded = function () { setWebglLoading(false); };
+    WebGLBridge.onError = function (err) { console.error('WebGL error:', err); setWebglLoading(false); };
+  }, []);
+
   // Fetch catalog from server on mount
   useEffect(() => {
     VFX_API.fetchCatalog().then(data => {
@@ -162,27 +174,27 @@ function App() {
       <div className="layout">
         <Sidebar tree={tree} counts={counts} total={catalog.items.length} current={category} onPick={setCategory} />
 
-        <main className=”content”>
+        <main className="content">
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px', opacity: 0.5 }}>
               <div style={{ width: 40, height: 40, border: '3px solid var(--accent, #7c4dff)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
               <p style={{ fontFamily: 'var(--font)', fontSize: 14, color: '#888' }}>Loading catalog...</p>
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              <style dangerouslySetInnerHTML={{ __html: '@keyframes spin { to { transform: rotate(360deg); } }' }} />
             </div>
           ) : (
             <>
-              <div className=”crumbs”>
+              <div className="crumbs">
                 <span>Library</span>
-                <span className=”sep”>/</span>
+                <span className="sep">/</span>
                 <b>{title}</b>
               </div>
-              <div className=”content-head”>
+              <div className="content-head">
                 <div>
                   <h1>{title}</h1>
-                  <div className=”result-count”><b>{filtered.length}</b> {filtered.length === 1 ? 'effect' : 'effects'}{search.trim() ? ` matching “${search.trim()}”` : ''}</div>
+                  <div className="result-count"><b>{filtered.length}</b> {filtered.length === 1 ? 'effect' : 'effects'}{search.trim() ? ' matching "' + search.trim() + '"' : ''}</div>
                 </div>
-                <div className=”sortbar”>
-                  <div className=”seg”>
+                <div className="sortbar">
+                  <div className="seg">
                     <button className={sort === 'recent' ? 'on' : ''} onClick={() => setSort('recent')}>Recent</button>
                     <button className={sort === 'name' ? 'on' : ''} onClick={() => setSort('name')}>Name</button>
                     <button className={sort === 'size' ? 'on' : ''} onClick={() => setSort('size')}>Size</button>
@@ -191,12 +203,12 @@ function App() {
               </div>
 
               {showFeatured && featured.length > 0 && (
-                <div className=”featured”>
-                  <div className=”featured-head”>
-                    <span className=”dot” />
+                <div className="featured">
+                  <div className="featured-head">
+                    <span className="dot" />
                     <h2>Featured this week</h2>
                   </div>
-                  <div className=”featured-row”>
+                  <div className="featured-row">
                     {featured.map(it => <Card key={it.id} item={it} featured onOpen={setActive} onDownload={doDownload} />)}
                   </div>
                 </div>
@@ -208,7 +220,9 @@ function App() {
         </main>
       </div>
 
-      {active && <Modal item={active} onClose={() => setActive(null)} onDownload={doDownload} />}
+      {active && <Modal item={active} onClose={function () { setActive(null); WebGLBridge.detach(); }}
+        onDownload={doDownload} webglReady={webglReady} webglLoading={webglLoading}
+        onWebglLoad={function () { setWebglLoading(true); }} />}
 
       {toast && (
         <div className="toast">
