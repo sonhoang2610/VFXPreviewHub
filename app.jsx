@@ -59,6 +59,11 @@ function App() {
   const [active, setActive] = useState(null); // modal item
   const [toast, setToast] = useState(null);
 
+  // Admin state
+  const [showAdminPw, setShowAdminPw] = useState(false);
+  const [adminToken, setAdminToken] = useState(null);
+  const [showAdmin, setShowAdmin] = useState(false);
+
   // WebGL viewer state
   const [webglReady, setWebglReady] = useState(false);
   const [webglLoading, setWebglLoading] = useState(false);
@@ -169,7 +174,8 @@ function App() {
     <div className="hub-root" data-style={t.style} style={rootStyle}>
       <Header user={user} search={search} setSearch={setSearch}
         onLogin={() => { window.location.href = '/auth/google'; }}
-        onLogout={() => { localStorage.removeItem('vfx_token'); setUser(null); }} />
+        onLogout={() => { localStorage.removeItem('vfx_token'); setUser(null); }}
+        onAdminTrigger={() => { if (adminToken) { setShowAdmin(true); } else { setShowAdminPw(true); } }} />
 
       <div className="layout">
         <Sidebar tree={tree} counts={counts} total={catalog.items.length} current={category} onPick={setCategory} />
@@ -255,6 +261,16 @@ function App() {
           options={['Space Grotesk', 'Archivo', 'System']}
           onChange={(v) => setTweak('font', v)} />
       </TweaksPanel>
+
+      {showAdminPw && <AdminPasswordModal
+        onSuccess={(token) => { setAdminToken(token); setShowAdminPw(false); setShowAdmin(true); }}
+        onClose={() => setShowAdminPw(false)} />}
+
+      {showAdmin && adminToken && <AdminPanel
+        adminToken={adminToken}
+        catalog={catalog}
+        onCatalogChange={(data) => setCatalog(data)}
+        onClose={() => setShowAdmin(false)} />}
     </div>
   );
 }

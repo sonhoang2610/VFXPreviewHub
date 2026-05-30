@@ -1,4 +1,4 @@
-// data.js — Fetch VFX catalog from server API
+﻿// data.js — Fetch VFX catalog from server API
 // The API base URL is the same origin since the server serves this frontend
 window.VFX_CATALOG = {
   version: 1,

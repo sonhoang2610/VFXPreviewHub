@@ -17,10 +17,24 @@ function initials(name) {
 }
 
 /* ── Header ───────────────────────────────────────────────── */
-function Header({ user, onLogin, onLogout, search, setSearch }) {
+function Header({ user, onLogin, onLogout, search, setSearch, onAdminTrigger }) {
+  var _clicks = useRef(0);
+  var _timer = useRef(null);
+
+  function handleLogoClick() {
+    _clicks.current++;
+    if (_timer.current) clearTimeout(_timer.current);
+    if (_clicks.current >= 5) {
+      _clicks.current = 0;
+      if (onAdminTrigger) onAdminTrigger();
+    } else {
+      _timer.current = setTimeout(function () { _clicks.current = 0; }, 2000);
+    }
+  }
+
   return (
     <header className="hdr">
-      <div className="brand">
+      <div className="brand" onClick={handleLogoClick} style={{ cursor: 'default', userSelect: 'none' }}>
         <span className="brand-mark">
           <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.2 6.6L21 9.2l-5.5 4.1L17.6 20 12 16l-5.6 4 2.1-6.7L3 9.2l6.8-.6z" /></svg>
         </span>
