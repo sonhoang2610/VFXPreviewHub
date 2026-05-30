@@ -1,0 +1,265 @@
+/* ============================================================
+   Procedural VFX previews — pure CSS motion graphics.
+   Idle = frozen mid-frame (negative animation-delay + paused).
+   Hover (.is-playing) = animation runs. No JS rAF cost.
+   Each type keeps its own characteristic VFX color, independent
+   of the UI accent.
+   ============================================================ */
+
+.vfxp {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 120% at 50% 120%, rgba(255,255,255,0.04), transparent 60%),
+    #0c0d10;
+}
+
+/* Every animated child is paused by default, frozen at a representative
+   frame via its negative delay. Plays on hover. */
+.vfxp .p,
+.vfxp .glow,
+.vfxp .ring,
+.vfxp .bolt,
+.vfxp .arc {
+  animation-play-state: paused;
+}
+.vfxp.is-playing .p,
+.vfxp.is-playing .glow,
+.vfxp.is-playing .ring,
+.vfxp.is-playing .bolt,
+.vfxp.is-playing .arc {
+  animation-play-state: running;
+}
+
+.vfxp .glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 70%;
+  height: 70%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  filter: blur(14px);
+  pointer-events: none;
+}
+
+.vfxp .p {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform, opacity;
+}
+
+/* ── FIRE ─────────────────────────────────────────────────── */
+.vfxp-fire { background: radial-gradient(120% 100% at 50% 120%, rgba(255,90,20,0.18), transparent 62%), #0c0a09; }
+.vfxp-fire .glow {
+  background: radial-gradient(circle, rgba(255,140,30,0.9), rgba(255,60,0,0) 70%);
+  top: auto; bottom: -10%; width: 60%; height: 60%;
+  animation: fireFlicker 0.45s ease-in-out infinite alternate;
+}
+.vfxp-fire .p {
+  bottom: 8%;
+  background: radial-gradient(circle, #ffe27a, #ff7a18 55%, rgba(255,60,0,0) 75%);
+  animation: fireRise 1.5s ease-out infinite;
+}
+@keyframes fireRise {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0; }
+  12%  { opacity: 1; }
+  100% { transform: translate(var(--dx, 0), -150%) scale(0.2); opacity: 0; }
+}
+@keyframes fireFlicker {
+  0%   { transform: translate(-50%, 0) scale(1);   opacity: 0.8; }
+  100% { transform: translate(-50%, 0) scale(1.12); opacity: 1; }
+}
+
+/* ── EXPLOSION ────────────────────────────────────────────── */
+.vfxp-explosion { background: radial-gradient(circle at 50% 50%, rgba(255,120,40,0.16), transparent 60%), #0d0b0a; }
+.vfxp-explosion .glow {
+  background: radial-gradient(circle, rgba(255,180,80,0.95), rgba(255,80,0,0) 70%);
+  width: 40%; height: 40%;
+  animation: boomGlow 1.6s ease-out infinite;
+}
+.vfxp-explosion .p {
+  left: 50%; top: 50%;
+  background: radial-gradient(circle, #fff1c2, #ff8a2b 60%, rgba(255,60,0,0) 78%);
+  animation: boomBurst 1.6s cubic-bezier(0.15,0.7,0.3,1) infinite;
+}
+@keyframes boomBurst {
+  0%   { transform: translate(-50%, -50%) rotate(var(--ang)) translateX(0) scale(0.3); opacity: 0; }
+  10%  { opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(var(--ang)) translateX(var(--dist, 70px)) scale(0.15); opacity: 0; }
+}
+@keyframes boomGlow {
+  0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 0; }
+  14%  { opacity: 1; }
+  60%  { opacity: 0.5; }
+  100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+}
+.vfxp .ring {
+  position: absolute; left: 50%; top: 50%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.vfxp-explosion .ring {
+  width: 20%; height: 20%;
+  border: 2px solid rgba(255,200,120,0.8);
+  animation: boomRing 1.6s ease-out infinite;
+}
+@keyframes boomRing {
+  0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 0; }
+  12%  { opacity: 0.9; }
+  100% { transform: translate(-50%, -50%) scale(3.2); opacity: 0; }
+}
+
+/* ── MAGIC ────────────────────────────────────────────────── */
+.vfxp-magic { background: radial-gradient(circle at 50% 50%, rgba(124,77,255,0.18), transparent 62%), #0a0a14; }
+.vfxp-magic .glow {
+  background: radial-gradient(circle, rgba(150,110,255,0.9), rgba(0,229,255,0) 70%);
+  width: 45%; height: 45%;
+  animation: magicPulse 2s ease-in-out infinite;
+}
+.vfxp-magic .p {
+  left: 50%; top: 50%;
+  background: radial-gradient(circle, #d9c8ff, #7c4dff 55%, rgba(0,229,255,0) 78%);
+  animation: magicOrbit 3s linear infinite;
+}
+@keyframes magicOrbit {
+  0%   { transform: translate(-50%, -50%) rotate(var(--ang)) translateX(var(--rad, 36px)) rotate(calc(-1 * var(--ang))) scale(1); opacity: 0.9; }
+  50%  { transform: translate(-50%, -50%) rotate(calc(var(--ang) + 180deg)) translateX(calc(var(--rad, 36px) * 0.6)) rotate(calc(-1 * var(--ang) - 180deg)) scale(0.6); opacity: 0.5; }
+  100% { transform: translate(-50%, -50%) rotate(calc(var(--ang) + 360deg)) translateX(var(--rad, 36px)) rotate(calc(-1 * var(--ang) - 360deg)) scale(1); opacity: 0.9; }
+}
+@keyframes magicPulse {
+  0%,100% { transform: translate(-50%, -50%) scale(0.85); opacity: 0.7; }
+  50%     { transform: translate(-50%, -50%) scale(1.1);  opacity: 1; }
+}
+
+/* ── HEAL ─────────────────────────────────────────────────── */
+.vfxp-heal { background: radial-gradient(120% 100% at 50% 120%, rgba(40,220,140,0.16), transparent 62%), #07100c; }
+.vfxp-heal .glow {
+  background: radial-gradient(circle, rgba(60,230,150,0.85), rgba(60,230,150,0) 70%);
+  top: auto; bottom: -8%; width: 55%; height: 55%;
+  animation: magicPulse 2s ease-in-out infinite;
+}
+.vfxp-heal .p {
+  bottom: 6%;
+  background: radial-gradient(circle, #d6ffe9, #2edc8c 55%, rgba(46,220,140,0) 78%);
+  animation: healRise 2.2s ease-out infinite;
+}
+@keyframes healRise {
+  0%   { transform: translate(0,0) scale(0.6); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translate(var(--dx,0), -160%) scale(0.9); opacity: 0; }
+}
+.vfxp-heal .ring {
+  width: 30%; height: 30%; top: auto; bottom: 0;
+  border: 2px solid rgba(120,255,190,0.7);
+  transform: translate(-50%, 0);
+  animation: healRing 2.2s ease-out infinite;
+}
+@keyframes healRing {
+  0%   { transform: translate(-50%, 40%) scale(0.4); opacity: 0; }
+  20%  { opacity: 0.8; }
+  100% { transform: translate(-50%, -120%) scale(1.1); opacity: 0; }
+}
+
+/* ── LIGHTNING ────────────────────────────────────────────── */
+.vfxp-lightning { background: radial-gradient(circle at 50% 40%, rgba(0,200,255,0.14), transparent 60%), #060b10; }
+.vfxp-lightning .glow {
+  background: radial-gradient(circle, rgba(80,220,255,0.85), rgba(0,229,255,0) 70%);
+  width: 40%; height: 40%;
+  animation: boltFlash 0.5s steps(2) infinite;
+}
+.vfxp-lightning .bolt {
+  position: absolute;
+  left: 50%;
+  width: 3px;
+  background: linear-gradient(to bottom, rgba(220,250,255,0), #aef2ff 30%, #28c8ff 70%, rgba(0,229,255,0));
+  filter: drop-shadow(0 0 4px #28c8ff);
+  transform-origin: top center;
+  animation: boltFlash 0.42s steps(2) infinite;
+}
+@keyframes boltFlash {
+  0%, 49%  { opacity: 1; }
+  50%,100% { opacity: 0.08; }
+}
+
+/* ── SMOKE ────────────────────────────────────────────────── */
+.vfxp-smoke { background: radial-gradient(120% 100% at 50% 120%, rgba(180,180,190,0.12), transparent 62%), #0d0e10; }
+.vfxp-smoke .p {
+  bottom: 4%;
+  background: radial-gradient(circle, rgba(200,200,210,0.55), rgba(150,150,160,0) 70%);
+  filter: blur(3px);
+  animation: smokeRise 3.4s ease-out infinite;
+}
+@keyframes smokeRise {
+  0%   { transform: translate(0,0) scale(0.5); opacity: 0; }
+  20%  { opacity: 0.6; }
+  100% { transform: translate(var(--dx,0), -150%) scale(2.2); opacity: 0; }
+}
+
+/* ── COIN ─────────────────────────────────────────────────── */
+.vfxp-coin { background: radial-gradient(circle at 50% 45%, rgba(255,200,60,0.16), transparent 60%), #0f0c06; }
+.vfxp-coin .glow {
+  background: radial-gradient(circle, rgba(255,210,90,0.8), rgba(255,180,0,0) 70%);
+  width: 40%; height: 40%;
+  animation: magicPulse 1.6s ease-in-out infinite;
+}
+.vfxp-coin .p {
+  left: 50%; bottom: 50%;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #fff3c0, #ffc830 55%, #e0941a);
+  box-shadow: 0 0 5px rgba(255,200,80,0.7);
+  animation: coinPop 1.8s cubic-bezier(0.2,0.7,0.4,1) infinite;
+}
+@keyframes coinPop {
+  0%   { transform: translate(-50%, 0) rotateY(0deg) scale(0.4); opacity: 0; }
+  15%  { opacity: 1; }
+  55%  { transform: translate(calc(-50% + var(--dx,0)), var(--rise,-60px)) rotateY(360deg) scale(1); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx,0)), 30px) rotateY(720deg) scale(0.5); opacity: 0; }
+}
+
+/* ── SLASH ────────────────────────────────────────────────── */
+.vfxp-slash { background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.08), transparent 60%), #0b0c0e; }
+.vfxp-slash .arc {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 150%; height: 150%;
+  transform: translate(-50%, -50%) rotate(-35deg);
+  border-radius: 50%;
+  background: conic-gradient(from 200deg, rgba(255,255,255,0) 0deg, rgba(255,255,255,0) 20deg, #ffffff 32deg, #8ad7ff 38deg, rgba(255,255,255,0) 52deg, rgba(255,255,255,0) 360deg);
+  -webkit-mask: radial-gradient(circle, transparent 58%, #000 59%, #000 70%, transparent 71%);
+          mask: radial-gradient(circle, transparent 58%, #000 59%, #000 70%, transparent 71%);
+  animation: slashSweep 1.1s ease-out infinite;
+}
+@keyframes slashSweep {
+  0%   { transform: translate(-50%, -50%) rotate(-90deg); opacity: 0; }
+  20%  { opacity: 1; }
+  60%  { transform: translate(-50%, -50%) rotate(20deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(40deg); opacity: 0; }
+}
+
+/* ── BUFF ─────────────────────────────────────────────────── */
+.vfxp-buff { background: radial-gradient(120% 100% at 50% 120%, rgba(120,180,255,0.16), transparent 62%), #080b12; }
+.vfxp-buff .glow {
+  background: radial-gradient(circle, rgba(120,180,255,0.8), rgba(60,140,255,0) 70%);
+  top: auto; bottom: -6%; width: 50%; height: 50%;
+  animation: magicPulse 2s ease-in-out infinite;
+}
+.vfxp-buff .ring {
+  top: auto; bottom: 0;
+  width: 40%; height: 40%;
+  border: 2px solid rgba(150,200,255,0.7);
+  transform: translate(-50%, 0);
+  animation: buffRing 2s ease-out infinite;
+}
+@keyframes buffRing {
+  0%   { transform: translate(-50%, 60%) scale(0.4) rotateX(60deg); opacity: 0; }
+  20%  { opacity: 0.9; }
+  100% { transform: translate(-50%, -140%) scale(0.9) rotateX(60deg); opacity: 0; }
+}
+.vfxp-buff .p {
+  bottom: 10%;
+  background: radial-gradient(circle, #dceaff, #5b9bff 55%, rgba(60,140,255,0) 78%);
+  animation: healRise 2.2s ease-out infinite;
+}
