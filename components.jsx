@@ -113,12 +113,17 @@ function Sidebar({ tree, counts, total, current, onPick }) {
 
 /* ── Card ─────────────────────────────────────────────────── */
 function Card({ item, onOpen, onDownload, featured }) {
-  const [hover, setHover] = useState(false);
   const meta = catMeta(item.category);
   return (
-    <div className="card" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={() => onOpen(item)}>
+    <div className="card" onClick={() => onOpen(item)}>
       <div className="card-thumb">
-        <VFXPreview type={item.previewType} playing={hover} seedKey={item.id} />
+        <img
+          src={VFX_API.thumbnailUrl(item.id)}
+          alt={item.name}
+          loading="lazy"
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={(e) => { e.target.style.display = 'none'; }}
+        />
         <span className="card-cat-badge">
           <span className="swatch" style={{ background: meta.hue }} />
           {item.category}
@@ -173,7 +178,7 @@ function DownloadZone({ item, onDownload }) {
   const [copied, setCopied] = useState(false);
   const wrapRef = useRef(null);
   const p = PLATFORMS.find(x => x.id === platform);
-  const url = `https://hub.ikame.vn/api/vfx/${item.id}/download?engine=${platform}`;
+  const url = VFX_API.downloadUrl(item.id);
 
   useEffect(() => {
     const h = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
@@ -246,10 +251,14 @@ function Modal({ item, onClose, onDownload }) {
     <div className="modal-scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal">
         <div className="modal-preview">
-          <VFXPreview type={item.previewType} playing={true} seedKey={item.id + '_modal'} />
+          <img
+            src={VFX_API.thumbnailUrl(item.id)}
+            alt={item.name}
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
           <div className="mp-tools">
-            <span className="mp-pill"><span className="live" /> LIVE PREVIEW</span>
-            <span className="mp-pill">{item.previewType}</span>
+            <span className="mp-pill">PREVIEW</span>
+            <span className="mp-pill">{item.category}</span>
           </div>
         </div>
         <div className="modal-info">

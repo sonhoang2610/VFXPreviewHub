@@ -49,7 +49,8 @@ function buildCounts(items) {
 
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const catalog = window.VFX_CATALOG;
+  const [catalog, setCatalog] = useState(window.VFX_CATALOG);
+  const [loading, setLoading] = useState(true);
 
   const [user, setUser] = useState(null);
   const [search, setSearch] = useState('');
@@ -57,6 +58,38 @@ function App() {
   const [sort, setSort] = useState('recent');
   const [active, setActive] = useState(null); // modal item
   const [toast, setToast] = useState(null);
+
+  // Fetch catalog from server on mount
+  useEffect(() => {
+    VFX_API.fetchCatalog().then(data => {
+      setCatalog(data);
+      setLoading(false);
+    });
+  }, []);
+
+  // Check for OAuth token on page load (from redirect)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token) {
+      localStorage.setItem('vfx_token', token);
+      window.history.replaceState({}, document.title, '/');
+    }
+
+    const savedToken = localStorage.getItem('vfx_token');
+    if (savedToken) {
+      try {
+        const payload = JSON.parse(atob(savedToken.split('.')[1]));
+        if (payload.exp * 1000 > Date.now()) {
+          setUser({ name: payload.name, email: payload.email });
+        } else {
+          localStorage.removeItem('vfx_token');
+        }
+      } catch (e) {
+        localStorage.removeItem('vfx_token');
+      }
+    }
+  }, []);
 
   const tree = useMemo(() => buildTree(catalog.categories), [catalog]);
   const counts = useMemo(() => buildCounts(catalog.items), [catalog]);
@@ -91,6 +124,15 @@ function App() {
   const showFeatured = !category && !search.trim() && t.style !== 'dense';
 
   function doDownload(item, platform) {
+    // Actually download the file
+    const link = document.createElement('a');
+    link.href = VFX_API.downloadUrl(item.id);
+    link.download = item.name + '.zip';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Show toast
     setToast({ name: item.name, signed: !!user, platform: platform || null });
     clearTimeout(window.__toastT);
     window.__toastT = setTimeout(() => setToast(null), 2800);
@@ -114,45 +156,55 @@ function App() {
   return (
     <div className="hub-root" data-style={t.style} style={rootStyle}>
       <Header user={user} search={search} setSearch={setSearch}
-        onLogin={() => setUser({ name: 'Anh Nguyen' })}
-        onLogout={() => setUser(null)} />
+        onLogin={() => { window.location.href = '/auth/google'; }}
+        onLogout={() => { localStorage.removeItem('vfx_token'); setUser(null); }} />
 
       <div className="layout">
         <Sidebar tree={tree} counts={counts} total={catalog.items.length} current={category} onPick={setCategory} />
 
-        <main className="content">
-          <div className="crumbs">
-            <span>Library</span>
-            <span className="sep">/</span>
-            <b>{title}</b>
-          </div>
-          <div className="content-head">
-            <div>
-              <h1>{title}</h1>
-              <div className="result-count"><b>{filtered.length}</b> {filtered.length === 1 ? 'effect' : 'effects'}{search.trim() ? ` matching “${search.trim()}”` : ''}</div>
+        <main className=”content”>
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px', opacity: 0.5 }}>
+              <div style={{ width: 40, height: 40, border: '3px solid var(--accent, #7c4dff)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              <p style={{ fontFamily: 'var(--font)', fontSize: 14, color: '#888' }}>Loading catalog...</p>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
-            <div className="sortbar">
-              <div className="seg">
-                <button className={sort === 'recent' ? 'on' : ''} onClick={() => setSort('recent')}>Recent</button>
-                <button className={sort === 'name' ? 'on' : ''} onClick={() => setSort('name')}>Name</button>
-                <button className={sort === 'size' ? 'on' : ''} onClick={() => setSort('size')}>Size</button>
+          ) : (
+            <>
+              <div className=”crumbs”>
+                <span>Library</span>
+                <span className=”sep”>/</span>
+                <b>{title}</b>
               </div>
-            </div>
-          </div>
+              <div className=”content-head”>
+                <div>
+                  <h1>{title}</h1>
+                  <div className=”result-count”><b>{filtered.length}</b> {filtered.length === 1 ? 'effect' : 'effects'}{search.trim() ? ` matching “${search.trim()}”` : ''}</div>
+                </div>
+                <div className=”sortbar”>
+                  <div className=”seg”>
+                    <button className={sort === 'recent' ? 'on' : ''} onClick={() => setSort('recent')}>Recent</button>
+                    <button className={sort === 'name' ? 'on' : ''} onClick={() => setSort('name')}>Name</button>
+                    <button className={sort === 'size' ? 'on' : ''} onClick={() => setSort('size')}>Size</button>
+                  </div>
+                </div>
+              </div>
 
-          {showFeatured && featured.length > 0 && (
-            <div className="featured">
-              <div className="featured-head">
-                <span className="dot" />
-                <h2>Featured this week</h2>
-              </div>
-              <div className="featured-row">
-                {featured.map(it => <Card key={it.id} item={it} featured onOpen={setActive} onDownload={doDownload} />)}
-              </div>
-            </div>
+              {showFeatured && featured.length > 0 && (
+                <div className=”featured”>
+                  <div className=”featured-head”>
+                    <span className=”dot” />
+                    <h2>Featured this week</h2>
+                  </div>
+                  <div className=”featured-row”>
+                    {featured.map(it => <Card key={it.id} item={it} featured onOpen={setActive} onDownload={doDownload} />)}
+                  </div>
+                </div>
+              )}
+
+              <Grid items={filtered} onOpen={setActive} onDownload={doDownload} />
+            </>
           )}
-
-          <Grid items={filtered} onOpen={setActive} onDownload={doDownload} />
         </main>
       </div>
 
