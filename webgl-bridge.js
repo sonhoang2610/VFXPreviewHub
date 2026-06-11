@@ -46,13 +46,12 @@ window.WebGLBridge = {
   // Load an AssetBundle by item ID
   loadEffect: function loadEffect(itemId) {
     if (!this.isReady) return false;
-    var bundleUrl = '/api/vfx/' + itemId + '/bundle';
+    var jsonUrl = '/api/vfx/' + itemId + '/particle-json';
     this.isLoading = true;
-    // SendMessage to Unity via iframe
     this.iframe.contentWindow.postMessage({
       type: 'unity-command',
-      method: 'LoadBundle',
-      args: bundleUrl
+      method: 'LoadEffect',
+      args: jsonUrl
     }, '*');
     return true;
   },
@@ -70,6 +69,7 @@ window.WebGLBridge = {
   // Move the iframe element into a target container (for showing in modal)
   attachTo: function attachTo(container) {
     if (!this.iframe) return;
+    if (this.iframe.parentNode === container) return;
     this.iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
     container.appendChild(this.iframe);
   },

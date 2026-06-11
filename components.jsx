@@ -67,16 +67,53 @@ function Header({ user, onLogin, onLogout, search, setSearch, onAdminTrigger }) 
 
 /* ── Sidebar ──────────────────────────────────────────────── */
 function Sidebar({ tree, counts, total, current, onPick }) {
-  const [expanded, setExpanded] = useState(() => {
-    const init = {};
-    Object.keys(tree).forEach(r => { init[r] = true; });
-    return init;
-  });
+  var _exp = useState({});
+  var expanded = _exp[0], setExpanded = _exp[1];
+
+  function toggle(path) {
+    setExpanded(function(s) { var n = Object.assign({}, s); n[path] = !n[path]; return n; });
+  }
+
+  function renderNode(subtree, parentPath, depth) {
+    return Object.keys(subtree).sort().map(function(name) {
+      var fullPath = parentPath ? parentPath + '/' + name : name;
+      var children = subtree[name];
+      var hasKids = Object.keys(children).length > 0;
+      var isOpen = expanded[fullPath] !== false;
+      var isActive = current === fullPath;
+      var meta = catMeta(name);
+      var indent = depth * 16;
+
+      return (
+        <div key={fullPath}>
+          <div
+            className={'cat' + (isActive ? ' active' : '') + (hasKids && isOpen ? ' expanded' : '')}
+            style={{ paddingLeft: 12 + indent }}
+            onClick={function() { onPick(fullPath); if (hasKids) toggle(fullPath); }}
+          >
+            {depth === 0 && (
+              <span className="cat-ico" style={{ color: isActive ? meta.hue : undefined }}>
+                <SvgIco d={meta.icon} size={15} />
+              </span>
+            )}
+            <span className="cat-name">{name}</span>
+            <span className="cat-count">{counts[fullPath] || 0}</span>
+            {hasKids && <span className="chev"><SvgIco d={Ic.chev} size={13} /></span>}
+          </div>
+          {hasKids && isOpen && (
+            <div className="cat-children">
+              {renderNode(children, fullPath, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
+  }
 
   return (
     <aside className="sidebar">
       <div className="side-title">Library</div>
-      <div className={'cat' + (current === null ? ' active' : '')} onClick={() => onPick(null)}>
+      <div className={'cat' + (current === null ? ' active' : '')} onClick={function() { onPick(null); }}>
         <span className="cat-ico"><SvgIco d={Ic.grid} size={15} /></span>
         <span className="cat-name">All effects</span>
         <span className="cat-count">{total}</span>
@@ -85,67 +122,65 @@ function Sidebar({ tree, counts, total, current, onPick }) {
       <div className="side-sep" />
       <div className="side-title">Categories</div>
 
-      {Object.keys(tree).sort().map(root => {
-        const children = tree[root];
-        const hasKids = children.length > 0;
-        const meta = catMeta(root);
-        const isOpen = expanded[root];
-        const rootActive = current === root;
-        return (
-          <div key={root}>
-            <div
-              className={'cat' + (rootActive ? ' active' : '') + (hasKids && isOpen ? ' expanded' : '')}
-              onClick={() => { onPick(root); if (hasKids) setExpanded(s => ({ ...s, [root]: !s[root] })); }}
-            >
-              <span className="cat-ico" style={{ color: rootActive ? meta.hue : undefined }}>
-                <SvgIco d={meta.icon} size={15} />
-              </span>
-              <span className="cat-name">{root}</span>
-              <span className="cat-count">{counts[root] || 0}</span>
-              {hasKids && <span className="chev"><SvgIco d={Ic.chev} size={13} /></span>}
-            </div>
-            {hasKids && isOpen && (
-              <div className="cat-children">
-                {children.map(ch => {
-                  const full = root + '/' + ch;
-                  return (
-                    <div key={full} className={'cat cat-child' + (current === full ? ' active' : '')}
-                         onClick={(e) => { e.stopPropagation(); onPick(full); }}>
-                      <span className="cat-name">{ch}</span>
-                      <span className="cat-count">{counts[full] || 0}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {renderNode(tree, '', 0)}
     </aside>
   );
 }
 
 /* ── Card ─────────────────────────────────────────────────── */
-function Card({ item, onOpen, onDownload, featured }) {
-  const meta = catMeta(item.category);
+function Card({ item, onOpen, onDownload, onPreview, featured, user }) {
+  var meta = catMeta(item.category);
+  var thumbRef = React.useRef(null);
+  var visibleRef = React.useRef(false);
+
+  React.useEffect(function() {
+    var el = thumbRef.current;
+    if (!el) return;
+    var observer = new IntersectionObserver(function(entries) {
+      var entry = entries[0];
+      var media = el.querySelector('video, img.lazy-thumb');
+      if (!media) return;
+      if (entry.isIntersecting) {
+        visibleRef.current = true;
+        if (!media.getAttribute('src')) {
+          media.setAttribute('src', VFX_API.thumbnailUrl(item.id));
+          if (media.tagName === 'VIDEO') media.play();
+        }
+      } else {
+        visibleRef.current = false;
+        if (media.getAttribute('src')) {
+          if (media.tagName === 'VIDEO') { media.pause(); }
+          media.removeAttribute('src');
+          if (media.tagName === 'VIDEO') media.load();
+        }
+      }
+    }, { rootMargin: '200px' });
+    observer.observe(el);
+    return function() { observer.disconnect(); };
+  }, [item.id]);
+
   return (
-    <div className="card" onClick={() => onOpen(item)}>
-      <div className="card-thumb">
-        <img
-          src={VFX_API.thumbnailUrl(item.id)}
-          alt={item.name}
-          loading="lazy"
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          onError={(e) => { e.target.style.display = 'none'; }}
+    <div className="card" onClick={function() { if (onPreview) onPreview(item); }}>
+      <div className="card-thumb" ref={thumbRef}>
+        <video
+          autoPlay loop muted playsInline
+          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          onError={function(e) {
+            var img = document.createElement('img');
+            img.className = 'lazy-thumb';
+            if (visibleRef.current) img.src = e.target.src;
+            img.style.cssText = 'width:100%;height:100%;object-fit:contain';
+            e.target.parentNode.replaceChild(img, e.target);
+          }}
         />
         <span className="card-cat-badge">
           <span className="swatch" style={{ background: meta.hue }} />
           {item.category}
         </span>
-        <button className="card-quickdl" title="Download package"
+        {user && <button className="card-quickdl" title="Download package"
                 onClick={(e) => { e.stopPropagation(); onDownload(item); }}>
           <SvgIco d={Ic.download} size={16} />
-        </button>
+        </button>}
       </div>
       <div className="card-body">
         <div className="card-name">{item.name}</div>
@@ -159,7 +194,7 @@ function Card({ item, onOpen, onDownload, featured }) {
 }
 
 /* ── Grid ─────────────────────────────────────────────────── */
-function Grid({ items, onOpen, onDownload }) {
+function Grid({ items, onOpen, onDownload, onPreview, user }) {
   if (!items.length) {
     return (
       <div className="grid">
@@ -173,7 +208,7 @@ function Grid({ items, onOpen, onDownload }) {
   }
   return (
     <div className="grid">
-      {items.map(it => <Card key={it.id} item={it} onOpen={onOpen} onDownload={onDownload} />)}
+      {items.map(it => <Card key={it.id} item={it} onOpen={onOpen} onDownload={onDownload} onPreview={onPreview} user={user} />)}
     </div>
   );
 }
@@ -249,8 +284,7 @@ function DownloadZone({ item, onDownload }) {
 }
 
 /* ── Modal ────────────────────────────────────────────────── */
-function Modal({ item, onClose, onDownload, webglReady, webglLoading, onWebglLoad }) {
-  var previewRef = useRef(null);
+function Modal({ item, onClose, onDownload, user }) {
 
   useEffect(function () {
     var k = function (e) { if (e.key === 'Escape') onClose(); };
@@ -259,15 +293,6 @@ function Modal({ item, onClose, onDownload, webglReady, webglLoading, onWebglLoa
     return function () { document.removeEventListener('keydown', k); document.body.style.overflow = ''; };
   }, [item]);
 
-  // When modal opens and WebGL is ready, attach viewer and load effect
-  useEffect(function () {
-    if (webglReady && previewRef.current && item) {
-      WebGLBridge.attachTo(previewRef.current);
-      WebGLBridge.loadEffect(item.id);
-      if (onWebglLoad) onWebglLoad();
-    }
-  }, [item, webglReady]);
-
   if (!item) return null;
   var meta = catMeta(item.category);
   var deps = item.dependencies || [];
@@ -275,24 +300,14 @@ function Modal({ item, onClose, onDownload, webglReady, webglLoading, onWebglLoa
   return (
     <div className="modal-scrim" onClick={function (e) { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal">
-        <div className="modal-preview" ref={previewRef}>
-          {!webglReady && (
-            <img
-              src={VFX_API.thumbnailUrl(item.id)}
-              alt={item.name}
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            />
-          )}
-          {webglLoading && (
-            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.5)', zIndex: 5 }}>
-              <div style={{ textAlign: 'center', color: '#fff' }}>
-                <div style={{ width: 30, height: 30, border: '2px solid #7c4dff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 8px' }}></div>
-                <div style={{ fontSize: 12, opacity: 0.7 }}>Loading effect...</div>
-              </div>
-            </div>
-          )}
+        <div className="modal-preview">
+          <img
+            src={VFX_API.thumbnailUrl(item.id)}
+            alt={item.name}
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
           <div className="mp-tools">
-            <span className="mp-pill">{webglReady ? <><span className="live"></span> LIVE</> : 'PREVIEW'}</span>
+            <span className="mp-pill">PREVIEW</span>
             <span className="mp-pill">{item.category}</span>
           </div>
         </div>
@@ -310,7 +325,7 @@ function Modal({ item, onClose, onDownload, webglReady, webglLoading, onWebglLoa
           <div className="specs">
             <div className="spec"><div className="sk">Particles</div><div className="sv">{item.particleCount}</div></div>
             <div className="spec"><div className="sk">Package size</div><div className="sv">{fmtSize(item.fileSize)}</div></div>
-            <div className="spec"><div className="sk">Preview</div><div className="sv">{item.previewType}</div></div>
+            <div className="spec"><div className="sk">Preview URL</div><div className="sv" style={{ cursor: 'pointer', color: 'var(--accent)' }} onClick={function() { var url = window.location.origin + '/api/vfx/' + item.id + '/particle-json'; try { navigator.clipboard.writeText(url); } catch(e) {} alert('Copied: ' + url); }} title="Click to copy">Copy URL</div></div>
             <div className="spec"><div className="sk">Effect ID</div><div className="sv">{item.id}</div></div>
           </div>
 
@@ -321,7 +336,7 @@ function Modal({ item, onClose, onDownload, webglReady, webglLoading, onWebglLoa
           </div>
 
           <div className="modal-foot">
-            <DownloadZone item={item} onDownload={onDownload} />
+            {user ? <DownloadZone item={item} onDownload={onDownload} /> : <p style={{ color: 'var(--text-mute)', fontSize: 13 }}>Sign in to download</p>}
           </div>
         </div>
       </div>

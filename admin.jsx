@@ -48,6 +48,8 @@ function AdminPasswordModal({ onSuccess, onClose }) {
 }
 
 function AdminPanel({ adminToken, catalog, onCatalogChange, onClose }) {
+  var _tab = useState('vfx');
+  var tab = _tab[0], setTab = _tab[1];
   var _sel = useState({});
   var selected = _sel[0], setSelected = _sel[1];
   var _filter = useState('');
@@ -146,7 +148,14 @@ function AdminPanel({ adminToken, catalog, onCatalogChange, onClose }) {
           <button className="btn btn-ghost" onClick={onClose} style={{ padding: '6px 12px' }}>Close</button>
         </div>
 
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ padding: '0 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 0 }}>
+          {['vfx', 'meshes', 'shaders', 'materials', 'textures'].map(function (t) {
+            return <button key={t} onClick={function () { setTab(t); setSelected({}); }}
+              style={{ padding: '10px 16px', border: 'none', background: tab === t ? 'var(--surface-2)' : 'transparent', color: tab === t ? 'var(--text)' : 'var(--text-mute)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent', textTransform: 'capitalize' }}>{t}</button>;
+          })}
+        </div>
+
+        {tab === 'vfx' && <><div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input value={filter} onChange={function (e) { setFilter(e.target.value); }}
             placeholder="Search by name or ID..."
             style={{ flex: 1, minWidth: 180, height: 34, padding: '0 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font)', fontSize: 13, outline: 'none' }} />
@@ -225,7 +234,9 @@ function AdminPanel({ adminToken, catalog, onCatalogChange, onClose }) {
 
         <div style={{ padding: '10px 20px', borderTop: '1px solid var(--border)', color: 'var(--text-mute)', fontSize: 12 }}>
           {catalog.items.length} total items · {cats.length} categories · {items.length} shown
-        </div>
+        </div></>}
+
+        {tab !== 'vfx' && <AssetTab type={tab} adminToken={adminToken} onFlash={flash} />}
       </div>
     </div>
   );
@@ -253,6 +264,107 @@ function AdminEditRow({ item, onSave, onCancel }) {
       <button onClick={onCancel}
         style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 11, color: 'var(--text-dim)' }}>Cancel</button>
     </span>
+  );
+}
+
+function AssetTab({ type, adminToken, onFlash }) {
+  var _items = useState([]);
+  var items = _items[0], setItems = _items[1];
+  var _loading = useState(true);
+  var loading = _loading[0], setLoading = _loading[1];
+  var _busy = useState(false);
+  var busy = _busy[0], setBusy = _busy[1];
+  var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken };
+
+  useEffect(function () {
+    setLoading(true);
+    // Map tab type to asset type for unified API (singular form)
+    var assetType = type === 'meshes' ? 'mesh' : type === 'shaders' ? 'shader' : type === 'materials' ? 'material' : type === 'textures' ? 'texture' : type;
+    fetch('/api/assets?type=' + assetType)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        setItems(data.assets || []);
+        setLoading(false);
+      })
+      .catch(function () { setLoading(false); });
+  }, [type]);
+
+  function deleteItem(id) {
+    if (!confirm('Delete ' + type.slice(0, -1) + ' ' + id + '?')) return;
+    setBusy(true);
+    fetch('/api/assets/' + id, { method: 'DELETE', headers: headers })
+      .then(function () {
+        setItems(items.filter(function (it) { return (it.guid || it.id || it) !== id; }));
+        setBusy(false);
+        if (onFlash) onFlash('Deleted');
+      })
+      .catch(function () { setBusy(false); if (onFlash) onFlash('Error'); });
+  }
+
+  function deleteAll() {
+    if (!confirm('Delete ALL ' + type + '?')) return;
+    if (!confirm('Are you sure? This cannot be undone.')) return;
+    setBusy(true);
+    var promises = items.map(function (it) {
+      var id = it.guid || it.id || it;
+      return fetch('/api/assets/' + id, { method: 'DELETE', headers: headers });
+    });
+    Promise.all(promises)
+      .then(function () { setItems([]); setBusy(false); if (onFlash) onFlash('All deleted'); })
+      .catch(function () { setBusy(false); });
+  }
+
+  var thStyle = { padding: '8px 10px', textAlign: 'left', color: 'var(--text-mute)', fontWeight: 600 };
+  var tdStyle = { padding: '6px 10px', color: 'var(--text)' };
+
+  return (
+    <>
+      <div style={{ padding: '8px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ flex: 1, fontSize: 13, color: 'var(--text-dim)' }}>{items.length} {type}</span>
+        <button className="btn" onClick={deleteAll} disabled={busy}
+          style={{ background: '#991b1b', color: '#fff', border: 'none', padding: '5px 12px', fontSize: 12 }}>
+          Delete All
+        </button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {loading ? (
+          <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-mute)' }}>Loading...</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 2 }}>
+                <th style={thStyle}>GUID</th>
+                <th style={thStyle}>Name</th>
+                <th style={thStyle}>Path</th>
+                {type === 'materials' && <th style={thStyle}>Shader</th>}
+                <th style={Object.assign({}, thStyle, { textAlign: 'right' })}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(function (it) {
+                var id = it.guid || it.id || it;
+                var name = it.name || id;
+                return (
+                  <tr key={id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={Object.assign({}, tdStyle, { fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-mute)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })} title={id}>{id}</td>
+                    <td style={tdStyle}>{name}</td>
+                    <td style={Object.assign({}, tdStyle, { fontSize: 11, color: 'var(--text-dim)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })} title={it.assetPath || ''}>{it.assetPath || '-'}</td>
+                    {type === 'materials' && <td style={Object.assign({}, tdStyle, { fontSize: 11, color: 'var(--text-dim)' })}>{it.shaderName || '-'}</td>}
+                    <td style={Object.assign({}, tdStyle, { textAlign: 'right' })}>
+                      <button onClick={function () { deleteItem(id); }} disabled={busy}
+                        style={{ background: 'none', border: 'none', color: '#ff5a5a', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Delete</button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {items.length === 0 && (
+                <tr><td colSpan="5" style={{ padding: 30, textAlign: 'center', color: 'var(--text-mute)' }}>No {type} found</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </>
   );
 }
 

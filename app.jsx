@@ -24,25 +24,26 @@ const ACCENT_OPTIONS = [
 
 function buildTree(categories) {
   const tree = {};
-  categories.forEach(path => {
-    const parts = path.split('/');
-    const root = parts[0];
-    if (!tree[root]) tree[root] = [];
-    if (parts.length > 1) {
-      const child = parts.slice(1).join('/');
-      if (!tree[root].includes(child)) tree[root].push(child);
+  categories.forEach(function(path) {
+    var parts = path.split('/');
+    var node = tree;
+    for (var i = 0; i < parts.length; i++) {
+      if (!node[parts[i]]) node[parts[i]] = {};
+      node = node[parts[i]];
     }
   });
   return tree;
 }
 
 function buildCounts(items) {
-  // Count per exact path AND per root (a parent shows the sum of its children).
-  const out = {};
-  items.forEach(it => {
-    out[it.category] = (out[it.category] || 0) + 1;
-    const root = it.category.split('/')[0];
-    if (root !== it.category) out[root] = (out[root] || 0) + 1;
+  // Count per exact path AND every ancestor path
+  var out = {};
+  items.forEach(function(it) {
+    var parts = it.category.split('/');
+    for (var i = 1; i <= parts.length; i++) {
+      var path = parts.slice(0, i).join('/');
+      out[path] = (out[path] || 0) + 1;
+    }
   });
   return out;
 }
@@ -55,9 +56,21 @@ function App() {
   const [user, setUser] = useState(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState(null);
-  const [sort, setSort] = useState('recent');
+  const [sort, setSort] = useState('category');
   const [active, setActive] = useState(null); // modal item
   const [toast, setToast] = useState(null);
+
+  // Preview panel state (floating overlay)
+  const [previewItem, setPreviewItem] = useState(null);
+
+  // Card click: first click = preview, second click same card = modal
+  function handleCardClick(item) {
+    if (previewItem && previewItem.id === item.id) {
+      setActive(item);
+    } else {
+      setPreviewItem(item);
+    }
+  }
 
   // Admin state
   const [showAdminPw, setShowAdminPw] = useState(false);
@@ -131,9 +144,10 @@ function App() {
       const q = search.trim().toLowerCase();
       items = items.filter(it => it.name.toLowerCase().includes(q) || it.category.toLowerCase().includes(q));
     }
-    if (sort === 'name') items.sort((a, b) => a.name.localeCompare(b.name));
+    if (sort === 'category') items.sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+    else if (sort === 'recent') items.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+    else if (sort === 'name') items.sort((a, b) => a.name.localeCompare(b.name));
     else if (sort === 'size') items.sort((a, b) => b.fileSize - a.fileSize);
-    else items.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
     return items;
   }, [catalog, category, search, sort]);
 
@@ -201,6 +215,7 @@ function App() {
                 </div>
                 <div className="sortbar">
                   <div className="seg">
+                    <button className={sort === 'category' ? 'on' : ''} onClick={() => setSort('category')}>Category</button>
                     <button className={sort === 'recent' ? 'on' : ''} onClick={() => setSort('recent')}>Recent</button>
                     <button className={sort === 'name' ? 'on' : ''} onClick={() => setSort('name')}>Name</button>
                     <button className={sort === 'size' ? 'on' : ''} onClick={() => setSort('size')}>Size</button>
@@ -215,20 +230,19 @@ function App() {
                     <h2>Featured this week</h2>
                   </div>
                   <div className="featured-row">
-                    {featured.map(it => <Card key={it.id} item={it} featured onOpen={setActive} onDownload={doDownload} />)}
+                    {featured.map(it => <Card key={it.id} item={it} featured onOpen={setActive} onDownload={doDownload} onPreview={handleCardClick} user={user} />)}
                   </div>
                 </div>
               )}
 
-              <Grid items={filtered} onOpen={setActive} onDownload={doDownload} />
+              <Grid items={filtered} onOpen={setActive} onDownload={doDownload} onPreview={handleCardClick} user={user} />
             </>
           )}
         </main>
       </div>
 
-      {active && <Modal item={active} onClose={function () { setActive(null); WebGLBridge.detach(); }}
-        onDownload={doDownload} webglReady={webglReady} webglLoading={webglLoading}
-        onWebglLoad={function () { setWebglLoading(true); }} />}
+      {active && <Modal item={active} onClose={function () { setActive(null); }}
+        onDownload={doDownload} user={user} />}
 
       {toast && (
         <div className="toast">
@@ -239,6 +253,13 @@ function App() {
           </div>
         </div>
       )}
+
+      {previewItem && <PreviewPanel
+        item={previewItem}
+        webglReady={webglReady}
+        webglLoading={webglLoading}
+        onWebglLoad={function () { setWebglLoading(true); }}
+        onClose={function () { setPreviewItem(null); }} />}
 
       <TweaksPanel>
         <TweakSection label="Style direction" />
