@@ -46,7 +46,7 @@ window.WebGLBridge = {
   // Load an AssetBundle by item ID
   loadEffect: function loadEffect(itemId) {
     if (!this.isReady) return false;
-    var jsonUrl = '/api/vfx/' + itemId + '/particle-json';
+    var jsonUrl = window.location.origin + '/api/vfx/' + itemId + '/particle-json';
     this.isLoading = true;
     this.iframe.contentWindow.postMessage({
       type: 'unity-command',
